@@ -1,0 +1,10 @@
+Revision history for CWB-CQP-More
+
+0.01    Tue Nov  9 22:15:58 WET 2010
+        - Added exec method with exceptions support (try/catch or eval);
+        - Added show_corpora method;
+        - Added corpora_details method;
+        - Added set method;
+        - Added change_corpus method;
+
+
