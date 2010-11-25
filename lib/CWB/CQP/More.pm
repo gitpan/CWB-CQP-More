@@ -14,11 +14,11 @@ CWB::CQP::More - A higher level interface for CWB::CQP
 
 =head1 VERSION
 
-Version 0.01
+Version 0.02
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 
 =head1 SYNOPSIS
@@ -32,11 +32,13 @@ our $VERSION = '0.01';
     # This needs to get fixed... not nice to say "'<b>'"
     $cqp->set(Context  => [20, 'words'],
               LD       => "'<b>'",
-              RT       => "'</b>'");
+              RD       => "'</b>'");
 
     # using Try::Tiny...
     try {
-        $cqp->exec('A = "dog"; cat A');
+        $cqp->exec('A = "dog";');
+        my $result_size = $cqp->size('A');
+        my @lines = $cqp->cat('A');
     } catch {
         print "Error: $_\n";
     }
@@ -64,6 +66,49 @@ sub new {
     $self->set_error_handler( sub {} );
     bless $self => $class;
     return $self;
+}
+
+=head2 size
+
+Uses the C<size> CQP command to fetch the size of a query result
+set. Pass it its name, returns an integer. C<-1> if the result set
+does not exist or an error occurred.
+
+=cut
+
+sub size {
+    my ($self, $name) = @_;
+    my $n;
+    try {
+        ($n) = $self->exec("size $name");
+    } catch {
+        return -1;
+    };
+    return $n;
+}
+
+=head2 cat
+
+This method uses the C<cat> method to return a result set. The first
+mandatory argument is the name of the result set. Second and Third
+arguments are optional, and correspond to the interval of matches to
+return.
+
+Returns empty list on any error.
+
+=cut
+
+sub cat {
+    my ($self, $id, $from, $to) = @_;
+    my $extra = "";
+    $extra = "$from $to" if $from && $to;
+    my @ans;
+    try {
+        @ans = $self->exec("cat $id $extra;");
+    } catch {
+        @ans = ();
+    };
+    return @ans;
 }
 
 =head2 annotation_show
@@ -239,6 +284,7 @@ L<http://search.cpan.org/dist/CWB-CQP-More/>
 
 =head1 ACKNOWLEDGEMENTS
 
+Thanks for Stefan Evert for all help.
 
 =head1 LICENSE AND COPYRIGHT
 

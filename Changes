@@ -1,5 +1,9 @@
 Revision history for CWB-CQP-More
 
+0.02    Thu Nov 25 13:32:11 WET 2010
+        - Added result_size method;
+        - Added cat method;
+
 0.01    Tue Nov  9 22:15:58 WET 2010
         - Added exec method with exceptions support (try/catch or eval);
         - Added show_corpora method;
