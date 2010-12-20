@@ -3,10 +3,12 @@ package CWB::CQP::More;
 use base CWB::CQP;
 use CWB;
 
+use Carp;
 use Try::Tiny;
-
+use Encode;
 use warnings;
 use strict;
+use POSIX::Open3;
 
 =head1 NAME
 
@@ -14,18 +16,18 @@ CWB::CQP::More - A higher level interface for CWB::CQP
 
 =head1 VERSION
 
-Version 0.02
+Version 0.03
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 
 =head1 SYNOPSIS
 
     use CWB::CQP::More;
 
-    my $cqp = CWB::CQP::More->new();
+    my $cqp = CWB::CQP::More->new( { utf8 => 1 } );
 
     $cqp->change_corpus('HANSARDS');
 
@@ -43,6 +45,8 @@ our $VERSION = '0.02';
         print "Error: $_\n";
     }
 
+    $cqp->annotation_show("pos");
+
     $details = $cqp->corpora_details('hansards');
 
     $available_corpora = $cqp->show_corpora;
@@ -56,16 +60,102 @@ functionalities.
 =head2 new
 
 The C<new> constructor has the same behavior has the C<CWB::CQP>
-C<new> method.
+C<new> method, unless the first argument is a hash reference. In that
+case, it is shifted and used as configuration for
+C<CWB::CQP::More>. The remaining arguments are sent unaltered to
+C<CWB::CQP> constructor.
 
 =cut
 
+sub _super_hacked_new {
+    my ($class, @options) = @_;
+    my $self = {};
+
+    # split options with values, e.g. "-r /my/registry" => "-r", "/my/registry"
+    # (doesn't work for multiple options in one string)
+    @options = map { (/^(--?[A-Za-z0-9]+)\s+(.+)$/) ? ($1, $2) : $_ } @options;
+
+    ## run CQP server in the background
+    my $in  = $self->{'in'}  = new FileHandle; # stdin  of CQP
+    my $out = $self->{'out'} = new FileHandle; # stdout of CQP
+    my $err = $self->{'err'} = new FileHandle; # stderr of CQP
+
+    my $pid = open3($in, $out, $err, $CWB::CQP, @CWB::CQP::CQP_options, @options);
+
+    $self->{'pid'} = $pid; # child process ID (so process can be killed if necessary)
+    $in->autoflush(1); # make sure that commands sent to CQP are always flushed immediately
+
+    my ($need_major, $need_minor, $need_beta) = split /\./, $CWB::CQP::CQP_version;
+    $need_beta = 0 unless $need_beta;
+
+    my $version_string = $out->getline; # child mode (-c) should print version on startup
+    chomp $version_string;
+    croak "ERROR: CQP backend startup failed ('$CWB::CQP @CWB::CQP::CQP_options @options')\n"
+      unless $version_string =~
+        m/^CQP\s+(?:\w+\s+)*([0-9]+)\.([0-9]+)(?:\.b?([0-9]+))?(?:\s+(.*))?$/;
+    $self->{'major_version'} = $1;
+    $self->{'minor_version'} = $2;
+    $self->{'beta_version'} = $3 || 0;
+    $self->{'compile_date'} = $4 || "unknown";
+    croak "ERROR: CQP version too old, need at least v$CWB::CQP::CQP_version ($version_string)\n"
+      unless ($1 > $need_major or
+              $1 == $need_major
+              and ($2 > $need_minor or
+                   ($2 == $need_minor and $3 >= $need_beta)));
+
+    ## command execution
+    $self->{'command'} = undef; # CQP command string that is currently being processed (undef = last command has been completed)
+    $self->{'lines'} = [];      # array of output lines read from CQP process
+    $self->{'buffer'} = "";     # read buffer for standard output from CQP process
+    $self->{'block_size'} = 256;  # block size for reading from CQP's output and error streams
+    $self->{'query_lock'} = undef;# holds random key while query lock mode is active
+    ## error handling (messages on stderr)
+    $self->{'error_handler'} = undef; # set to subref for user-defined error handler
+    $self->{'status'} = 'ok';         # status of last executed command ('ok' or 'error')
+    $self->{'error_message'} = [];    # arrayref to array containing message produced by last command (if any)
+    ## handling of CQP progress messages
+    $self->{'progress'} = 0;             # whether progress messages are activated
+    $self->{'progress_handler'} = undef; # optional callback for progress messages
+    $self->{'progress_info'} = [];       # contains last available progress information: [$total_percent, $pass, $n_passes, $message, $percent]
+    ## debugging (prints more or less everything on stdout)
+    $self->{'debug'} = 0;
+    ## select vectors for CQP output (stdout, stderr, stdout|stderr)
+    $self->{'select_err'} = new IO::Select($err);
+    $self->{'select_out'} = new IO::Select($out);
+    $self->{'select_any'} = new IO::Select($err, $out);
+    ## CQP object setup complete
+    bless($self, $class);
+    ## the following command will collect and ignore any output which may have been produced during startup
+    $self->exec("set PrettyPrint off"); # pretty-printing should be turned off for non-interactive use
+    return $self;
+}
+
 sub new {
     my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
+    my $conf = shift @args if ref($args[0]);
+
+
+    my $self = _super_hacked_new($class, @args);
+
+
+    for my $k (keys %$conf) {
+        $self->{"__$k"} = $conf->{$k};
+    }
     $self->set_error_handler( sub {} );
-    bless $self => $class;
     return $self;
+}
+
+=head2 utf8
+
+Set utf8 mode on or off. Pass it a 1 or a 0 as argument. Returns that
+same value. If used without arguments, returns current value.
+
+=cut
+
+sub utf8 {
+    my ($self, $v) = @_;
+    $self->{__utf8} = $v if $v;
+    return $self->{__utf8} || 0;
 }
 
 =head2 size
@@ -183,8 +273,10 @@ for an example.
 
 sub exec {
     my ($self, @args) = @_;
+    @args = map { Encode::_utf8_off($_); $_ } @args if $self->{__utf8};
     my @answer = $self->SUPER::exec(@args);
     die $self->error_message unless $self->ok;
+    @answer = map { Encode::_utf8_on($_); $_ } @answer if $self->{__utf8};
     return @answer;
 }
 
