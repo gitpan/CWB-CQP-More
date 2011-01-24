@@ -9,6 +9,7 @@ use Encode;
 use warnings;
 use strict;
 use POSIX::Open3;
+use CWB::CQP::More::Iterator;
 
 =head1 NAME
 
@@ -16,11 +17,11 @@ CWB::CQP::More - A higher level interface for CWB::CQP
 
 =head1 VERSION
 
-Version 0.03
+Version 0.04
 
 =cut
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 
 =head1 SYNOPSIS
@@ -191,7 +192,7 @@ Returns empty list on any error.
 sub cat {
     my ($self, $id, $from, $to) = @_;
     my $extra = "";
-    $extra = "$from $to" if $from && $to;
+    $extra = "$from $to" if defined($from) && defined($to);
     my @ans;
     try {
         @ans = $self->exec("cat $id $extra;");
@@ -333,6 +334,16 @@ sub show_corpora {
     return $ans;
 }
 
+=head2 iterator
+
+Returns a new iterator, to iterate over a result set. See
+L<CWB::CQP::More::Iterator> for documentation on how to use it.
+
+=cut
+
+sub iterator {
+    return CWB::CQP::More::Iterator->new(@_);
+}
 
 =head1 AUTHOR
 
@@ -380,7 +391,7 @@ Thanks for Stefan Evert for all help.
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2010 Alberto Simoes.
+Copyright 2010-2011 Alberto Simoes.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published
