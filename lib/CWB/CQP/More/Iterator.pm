@@ -1,6 +1,7 @@
 package CWB::CQP::More::Iterator;
 use Data::Dumper;
-our $VERSION = '0.01';
+
+our $VERSION = '0.02';
 
 sub new {
     my ($class, $cwb, $resultset, %ops) = @_;
@@ -47,6 +48,36 @@ sub next {
     } else {
         return undef
     }
+}
+
+sub peek {
+    my ($self, $offset) = @_;
+    my $cwb = $self->{cwb};
+
+    $offset = $self->{pos} + $offset;
+    if ($offset >= 0 && $offset < $self->{limit}) {
+        my ($line) = $cwb->cat($self->{fname}, $offset => $offset);
+        return $line;
+    } else {
+        return undef;
+    }
+}
+
+sub backward {
+    my ($self, $offset) = @_;
+    return $self->forward(-$offset);
+}
+
+sub forward {
+    my ($self, $offset) = @_;
+
+    $offset = $self->{pos} + $offset;
+
+    $offset = 0                  if $offset < 0;
+    $offset = $self->{limit} - 1 if $offset > $self->{limit};
+
+    $self->{pos} = $offset;
+    return $offset;
 }
 
 sub _min { $_[0] < $_[1] ? $_[0] : $_[1] }
@@ -102,12 +133,39 @@ Returns the next line(s) on the result set.
 
 Restarts the iterator.
 
+=head2 C<peek>
+
+Use peek to peek the iterator. Pass it a offset (positive or
+negative). It will return the concordance at that position. Note that
+the current iterator position is not changed!
+
+  my $peek     = $cwb->peek(100);  # look 100 positions ahead
+  my $backpeek = $cwb->peek(-100); # look 100 positions behind
+
 =head2 C<increment>
 
 Without arguments returns the current iterator increment size (number
 of lines returned by iteraction). With an argument, changes the size
 of the increment. The increment size can be changed while using the
 iterator.
+
+=head2 C<forward>
+
+Forwards the iterator the offset specified. If the offset is too big
+(as in, more iterations than the size of the iterator) the iterator is
+set to the last element. It also supports negative offsets (but please
+use the C<backward> method).
+
+The new position index is returned.
+
+=head2 C<backward>
+
+Backwards the iterator the offset specified. If the offset is too big
+(as in, more iterations than the current position of the iterator) the
+iterator is set to the first element. It also supports negative offsets
+(but please use the C<forward> method).
+
+The new position index is returned.
 
 =head1 SEE ALSO
 

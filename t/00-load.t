@@ -3,7 +3,7 @@
 use Test::More tests => 2;
 
 BEGIN {
-    use_ok( 'CWB::CQP::More' ) || print "Bail out!";
+    use_ok( 'CWB::CQP::More' )           || print "Bail out!";
     use_ok( 'CWB::CQP::More::Iterator' ) || print "Bail out!";
 }
 

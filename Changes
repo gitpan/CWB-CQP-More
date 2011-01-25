@@ -1,5 +1,9 @@
 Revision history for CWB-CQP-More
 
+0.05    Tue Jan 25 18:42:02 WET 2011
+        - added 'peek', 'forward' and 'backward' methods in iterator
+          module.
+
 0.04    Mon Jan 24 16:27:55 WET 2011
         - added iterator module
 
