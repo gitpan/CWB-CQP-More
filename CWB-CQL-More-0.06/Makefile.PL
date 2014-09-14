@@ -15,10 +15,10 @@ my %WriteMakefileArgs = (
   "CONFIGURE_REQUIRES" => {
     "ExtUtils::MakeMaker" => 0
   },
-  "DISTNAME" => "CWB-CQP-More",
+  "DISTNAME" => "CWB-CQL-More",
   "EXE_FILES" => [],
   "LICENSE" => "perl",
-  "NAME" => "CWB::CQP::More",
+  "NAME" => "CWB::CQL::More",
   "PREREQ_PM" => {
     "CWB" => 0,
     "Carp" => 0,
